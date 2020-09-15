@@ -8,8 +8,8 @@
 
 #define SKIP (0)
 #define OFFSET (0)
-#define CPYSIZE (0xD8000)
-//#define CPYSIZE (*(uint32_t *)(mbr + 0x24))
+//#define CPYSIZE (0xD8000)
+#define CPYSIZE (*(uint32_t *)(mbr + 0x24))
 
 void _start() __attribute__ ((weak, alias ("module_start")));
 int module_start(SceSize argc, const void *args) {

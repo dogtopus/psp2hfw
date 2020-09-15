@@ -52,6 +52,17 @@ do {                                   \
 
 #define SDSTOR_PROC_CHKO (0x2498)
 #define SDSTOR_PROC_CHKT (0x2940)
+
+#if defined(FULL_REDIR)
+#define CHECK_REDIR_BOUNDARY(sector) (1)
+#define CHECK_REDIR_BOUNDARY_UNLIKELY(sector) CHECK_REDIR_BOUNDARY(sector)
+#else
+#define CHECK_REDIR_BOUNDARY(sector) ((sector < 0xD8000) && (sector > 0x7FFF))
+#define CHECK_REDIR_BOUNDARY_UNLIKELY(sector) unlikely(CHECK_REDIR_BOUNDARY(sector))
+#endif
+
+
+
 static const char sdstor_suppl_patch[4] = {0x01, 0x20, 0x00, 0xBF};
 static const char movsr01[2] = {0x01, 0x20};
 
@@ -81,13 +92,16 @@ static void *(*get_sd_context_part_validate_sd)(int sd_ctx_index) = NULL;
 static int sdif_read_sector_mmc_patched(void* ctx, int sector, char* buffer, int nSectors) {
 	if (ctx == get_sd_context_part_validate_mmc(0)) {
 		int ret;
+#ifndef FULL_REDIR
 		if (unlikely(sector == 0)) {
 			ret = sdif_read_sector_mmc(ctx, 1, buffer, 1);
 			if (ret >= 0 && nSectors > 1) {
 				ret = sdif_read_sector_mmc(ctx, 1, buffer + 0x200, nSectors-1);
 			}
 			return ret;
-		} else if ((sector < 0xD8000) && (sector > 0x7FFF)) {
+		}
+#endif
+		if (CHECK_REDIR_BOUNDARY(sector)) {
 			ret = sdif_read_sector_sd(get_sd_context_part_validate_sd(1), sector, buffer, nSectors);
 			if (ret < 0)
 				ret = sdif_read_sector_mmc(ctx, sector, buffer, nSectors);
@@ -98,7 +112,7 @@ static int sdif_read_sector_mmc_patched(void* ctx, int sector, char* buffer, int
 }
 
 static int sdif_write_sector_mmc_patched(void* ctx, int sector, char* buffer, int nSectors) {
-	if ((ctx == get_sd_context_part_validate_mmc(0)) && unlikely((sector < 0xD8000) && (sector > 0x7FFF))) {
+	if ((ctx == get_sd_context_part_validate_mmc(0)) && CHECK_REDIR_BOUNDARY_UNLIKELY(sector)) {
 		int ret = sdif_write_sector_sd(get_sd_context_part_validate_sd(1), sector, buffer, nSectors);
 		if (ret < 0)
 			ret = sdif_write_sector_mmc(ctx, sector, buffer, nSectors);
